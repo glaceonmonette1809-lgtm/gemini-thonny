@@ -2,11 +2,20 @@ import os
 import platform
 import shutil
 import tempfile
+import urllib.request
 import zipfile
 from pathlib import Path
 
 
-def find_plugins_dir():
+PROJECT_ZIP = (
+    "https://github.com/"
+    "glaceonmonette1809-lgtm/"
+    "gemini-thonny/"
+    "archive/refs/heads/main.zip"
+)
+
+
+def find_thonny_plugins():
     home = Path.home()
 
     if platform.system() == "Windows":
@@ -16,57 +25,111 @@ def find_plugins_dir():
                 home / "AppData" / "Roaming"
             )
         )
-        return appdata / "Thonny" / "plugins"
+
+        thonny = appdata / "Thonny"
+
+        # Tìm Pythonxxx/site-packages
+        matches = list(
+            thonny.glob(
+                "plugins/Python*/site-packages"
+            )
+        )
+
+        if matches:
+            return matches[0]
+
+        # Nếu chưa có thì tạo vị trí mặc định.
+        return thonny / "plugins"
 
     if platform.system() == "Darwin":
-        return home / "Library" / "Thonny" / "plugins"
+        return (
+            home
+            / "Library"
+            / "Thonny"
+            / "plugins"
+        )
 
-    return home / ".config" / "Thonny" / "plugins"
+    return (
+        home
+        / ".config"
+        / "Thonny"
+        / "plugins"
+    )
 
 
 def main():
-
-    project_dir = Path(__file__).resolve().parent
-
-    zip_file = project_dir / "thonnycontrib.zip"
-
-    if not zip_file.exists():
-        raise FileNotFoundError(
-            f"Không tìm thấy {zip_file}"
-        )
-
-    plugins_dir = find_plugins_dir()
-    plugins_dir.mkdir(
-        parents=True,
-        exist_ok=True
-    )
+    print("Installing Gemini Thonny...")
 
     with tempfile.TemporaryDirectory() as temp:
         temp = Path(temp)
 
+        project_zip = temp / "project.zip"
+
+        print("Downloading...")
+
+        urllib.request.urlretrieve(
+            PROJECT_ZIP,
+            project_zip
+        )
+
+        print("Extracting...")
+
         with zipfile.ZipFile(
-            zip_file,
+            project_zip,
             "r"
         ) as z:
             z.extractall(temp)
 
-        source = temp / "thonnycontrib"
+        project_dir = (
+            temp
+            / "gemini-thonny-main"
+        )
+
+        plugin_zip = (
+            project_dir
+            / "thonnycontrib.zip"
+        )
+
+        if not plugin_zip.exists():
+            raise RuntimeError(
+                "Không tìm thấy thonnycontrib.zip."
+            )
+
+        plugin_temp = temp / "plugin"
+
+        with zipfile.ZipFile(
+            plugin_zip,
+            "r"
+        ) as z:
+            z.extractall(plugin_temp)
+
+        source = plugin_temp / "thonnycontrib"
 
         if not source.exists():
-
             found = next(
-                temp.rglob("thonnycontrib"),
+                plugin_temp.rglob("thonnycontrib"),
                 None
             )
 
             if found is None:
                 raise RuntimeError(
-                    "Không tìm thấy thonnycontrib trong ZIP."
+                    "Không tìm thấy thư mục "
+                    "thonnycontrib."
                 )
 
             source = found
 
-        destination = plugins_dir / "thonnycontrib"
+        destination_dir = find_thonny_plugins()
+
+        destination_dir.mkdir(
+            parents=True,
+            exist_ok=True
+        )
+
+        destination = (
+            destination_dir
+            / "thonnycontrib"
+        )
 
         if destination.exists():
             shutil.rmtree(destination)
@@ -77,11 +140,8 @@ def main():
         )
 
     print()
-    print("====================================")
-    print(" GThonny Updated")
-    print("====================================")
-    print()
-    print(destination)
+    print("Gemini Thonny installed successfully!")
+    print(f"Installed to: {destination}")
     print()
     print("Restart Thonny.")
 
