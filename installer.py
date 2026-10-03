@@ -78,12 +78,12 @@ def main():
 
     print()
     print("====================================")
-    print(" GEMINI THONNY CÀI ĐẶT THÀNH CÔNG")
+    print(" GThonny Updated")
     print("====================================")
     print()
     print(destination)
     print()
-    print("Khởi động lại Thonny.")
+    print("Restart Thonny.")
 
 
 if __name__ == "__main__":
