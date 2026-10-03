@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import os
 import platform
 import shutil
@@ -8,198 +6,85 @@ import zipfile
 from pathlib import Path
 
 
-ZIP_NAME = "thonnycontrib.zip"
-PLUGIN_NAME = "thonnycontrib"
-
-
-def find_thonny_plugins_dir():
-    """
-    Tự tìm thư mục plugins của Thonny.
-    Không hard-code username hoặc Python version.
-    """
-
+def find_plugins_dir():
     home = Path.home()
-    system = platform.system()
 
-    if system == "Windows":
+    if platform.system() == "Windows":
         appdata = Path(
             os.environ.get(
                 "APPDATA",
                 home / "AppData" / "Roaming"
             )
         )
-
         return appdata / "Thonny" / "plugins"
 
-    elif system == "Darwin":
+    if platform.system() == "Darwin":
         return home / "Library" / "Thonny" / "plugins"
 
-    else:
-        return home / ".config" / "Thonny" / "plugins"
+    return home / ".config" / "Thonny" / "plugins"
 
 
-def install():
-    current_dir = Path(__file__).resolve().parent
-    zip_file = current_dir / ZIP_NAME
+def main():
 
-    print("=" * 50)
-    print("       GEMINI THONNY INSTALLER")
-    print("=" * 50)
+    project_dir = Path(__file__).resolve().parent
 
-    # --------------------------------------------------------
-    # Kiểm tra ZIP
-    # --------------------------------------------------------
+    zip_file = project_dir / "thonnycontrib.zip"
 
     if not zip_file.exists():
-        print()
-        print("Không tìm thấy:")
-        print(zip_file)
-        input("\nNhấn Enter để thoát...")
-        return
-
-    # --------------------------------------------------------
-    # Tìm thư mục plugin của Thonny
-    # --------------------------------------------------------
-
-    plugins_dir = find_thonny_plugins_dir()
-    destination = plugins_dir / PLUGIN_NAME
-
-    print()
-    print("Thư mục Thonny:")
-    print(plugins_dir)
-
-    # --------------------------------------------------------
-    # Tạo thư mục plugins
-    # --------------------------------------------------------
-
-    try:
-        plugins_dir.mkdir(
-            parents=True,
-            exist_ok=True
+        raise FileNotFoundError(
+            f"Không tìm thấy {zip_file}"
         )
-    except Exception as e:
-        print()
-        print("Không thể tạo thư mục plugins:")
-        print(e)
-        input("\nNhấn Enter để thoát...")
-        return
 
-    # --------------------------------------------------------
-    # Giải nén ZIP vào thư mục tạm
-    # --------------------------------------------------------
+    plugins_dir = find_plugins_dir()
+    plugins_dir.mkdir(
+        parents=True,
+        exist_ok=True
+    )
 
-    try:
-        with tempfile.TemporaryDirectory() as temp_dir:
+    with tempfile.TemporaryDirectory() as temp:
+        temp = Path(temp)
 
-            temp_dir = Path(temp_dir)
+        with zipfile.ZipFile(
+            zip_file,
+            "r"
+        ) as z:
+            z.extractall(temp)
 
-            print()
-            print("Đang giải nén thonnycontrib.zip...")
+        source = temp / "thonnycontrib"
 
-            with zipfile.ZipFile(
-                zip_file,
-                "r"
-            ) as zip_ref:
+        if not source.exists():
 
-                zip_ref.extractall(temp_dir)
-
-            # ------------------------------------------------
-            # Tìm thư mục thonnycontrib
-            # ------------------------------------------------
-
-            extracted = temp_dir / PLUGIN_NAME
-
-            # Trường hợp ZIP có:
-            #
-            # thonnycontrib/
-            # ├── ...
-            #
-            # thì dùng trực tiếp.
-            #
-            # Nếu ZIP có thêm một thư mục bao ngoài,
-            # tìm tự động.
-            # ------------------------------------------------
-
-            if not extracted.is_dir():
-
-                found = None
-
-                for path in temp_dir.rglob(PLUGIN_NAME):
-
-                    if path.is_dir():
-                        found = path
-                        break
-
-                if found is None:
-                    print()
-                    print(
-                        "Không tìm thấy thư mục "
-                        "'thonnycontrib' trong ZIP."
-                    )
-
-                    input("\nNhấn Enter để thoát...")
-                    return
-
-                extracted = found
-
-            # ------------------------------------------------
-            # Xóa plugin cũ
-            # ------------------------------------------------
-
-            if destination.exists():
-
-                print()
-                print("Đang xóa bản cũ...")
-
-                if destination.is_dir():
-                    shutil.rmtree(destination)
-                else:
-                    destination.unlink()
-
-            # ------------------------------------------------
-            # Chép plugin mới
-            # ------------------------------------------------
-
-            print()
-            print("Đang cài plugin...")
-
-            shutil.copytree(
-                extracted,
-                destination
+            found = next(
+                temp.rglob("thonnycontrib"),
+                None
             )
 
-        # ----------------------------------------------------
-        # Thành công
-        # ----------------------------------------------------
+            if found is None:
+                raise RuntimeError(
+                    "Không tìm thấy thonnycontrib trong ZIP."
+                )
 
-        print()
-        print("=" * 50)
-        print("CÀI ĐẶT THÀNH CÔNG!")
-        print("=" * 50)
+            source = found
 
-        print()
-        print("Plugin:")
-        print(destination)
+        destination = plugins_dir / "thonnycontrib"
 
-        print()
-        print("Hãy đóng và mở lại Thonny.")
+        if destination.exists():
+            shutil.rmtree(destination)
 
-    except zipfile.BadZipFile:
-        print()
-        print("File thonnycontrib.zip bị lỗi hoặc không phải ZIP hợp lệ.")
+        shutil.copytree(
+            source,
+            destination
+        )
 
-    except PermissionError:
-        print()
-        print("Không có quyền ghi vào thư mục Thonny.")
-        print("Hãy đóng Thonny rồi chạy lại installer.")
-
-    except Exception as e:
-        print()
-        print("Cài đặt thất bại:")
-        print(e)
-
-    input("\nNhấn Enter để thoát...")
+    print()
+    print("====================================")
+    print(" GEMINI THONNY CÀI ĐẶT THÀNH CÔNG")
+    print("====================================")
+    print()
+    print(destination)
+    print()
+    print("Khởi động lại Thonny.")
 
 
 if __name__ == "__main__":
-    install()
+    main()
